@@ -1,0 +1,21 @@
+{
+  "name": "downloader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "content-disposition": "^0.5.4",
+    "express": "^4.18.2",
+    "fs": "^0.0.1-security",
+    "nodemon": "^2.0.22",
+    "sanitize-filename": "^1.6.3",
+    "ytdl-core": "^4.11.4",
+    "ytpl": "^2.3.0"
+  }
+}
