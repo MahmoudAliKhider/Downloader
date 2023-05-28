@@ -1,19 +1,16 @@
 const router = require("express").Router();
+
 const ytdl = require("ytdl-core");
 const fs = require("fs");
 const sanitize = require("sanitize-filename");
 const ytpl = require("ytpl");
 
-const os = require("os");
-const path = require("path");
-const send = require('send');
-
 router.post("/video", async (req, res) => {
-  const { url } = req.body;
-
   try {
-    if (!ytdl.validateURL(url)) {
-      return res.status(400).json({ error: "Invalid YouTube URL" });
+    const { url, localFilePath } = req.body;
+
+    if (!url || !ytdl.validateURL(url)) {
+      return res.status(400).json({ error: "Invalid YouTube URL " });
     }
 
     const info = await ytdl.getInfo(url);
@@ -22,58 +19,26 @@ router.post("/video", async (req, res) => {
     const sanitizedTitle = sanitize(info.videoDetails.title);
     const fileName = `${sanitizedTitle}.mp4`;
 
-    const filePath = path.join(os.tmpdir(), fileName);
+    const directory = localFilePath;
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory);
+    }
 
+    const filePath = `${directory}/${fileName}`;
     const fileStream = fs.createWriteStream(filePath);
 
-    fileStream.on("finish", () => {
-      const errorHandler = (err) => {
-        console.error("Error:", err.message);
-        res.status(500).json({ error: "An error occurred" });
-      };
+    ytdl(url, { filter: 'audioandvideo', quality: 'highest' }).pipe(fileStream);
 
-      const downloadStream = send(req, filePath, {
-        headers: {
-          "Content-Disposition": `attachment; filename="${fileName}"`,
-        },
-      });
-      downloadStream.on("error", errorHandler);
-      downloadStream.on("end", () => {
-        fs.unlink(filePath, (err) => {
-          if (err) {
-            console.error("Error:", err.message);
-          }
-        });
-      });
-
-      // Track the number of bytes sent
-      let bytesSent = 0;
-      downloadStream.on("data", (chunk) => {
-        bytesSent += chunk.length;
-      });
-
-      // Add bytesSent to the response header
-      res.setHeader("Content-Length", info.videoDetails.lengthSeconds);
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${fileName}"`
-      );
-      res.setHeader("X-Content-Length", bytesSent);
-
-      downloadStream.pipe(res);
+    fileStream.on('finish', () => {
+      res.sendFile(filePath);
     });
-
-    ytdl(url, { format: videoFormat }).pipe(fileStream);
-
-    req.on("aborted", () => {
-      fileStream.destroy();
-    });
-  } catch (error) {
-    console.error("Error:", error.message);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "An error occurred" });
   }
 });
+
+
 
 router.post("/audio", async (req, res) => {
   const { url, localFilePath } = req.body;
