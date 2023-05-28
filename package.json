@@ -10,11 +10,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "concat-stream": "^2.0.0",
     "content-disposition": "^0.5.4",
     "express": "^4.18.2",
+    "finalhandler": "^1.2.0",
     "fs": "^0.0.1-security",
     "nodemon": "^2.0.22",
+    "os": "^0.1.2",
+    "path": "^0.12.7",
+    "range-stream": "^2.0.0",
     "sanitize-filename": "^1.6.3",
+    "send": "^0.18.0",
     "ytdl-core": "^4.11.4",
     "ytpl": "^2.3.0"
   }

@@ -4,40 +4,75 @@ const fs = require("fs");
 const sanitize = require("sanitize-filename");
 const ytpl = require("ytpl");
 
-router.post("/video", async (req, res) => {
-  try {
-    const url = req.body.url;
+const os = require('os');
+const path = require('path');
 
-    if (!url || !ytdl.validateURL(url)) {
-      return res.status(400).json({ error: "Invalid YouTube URL " });
+router.post("/video", async (req, res) => {
+  const { url } = req.body;
+
+  try {
+    if (!ytdl.validateURL(url)) {
+      return res.status(400).json({ error: 'Invalid YouTube URL' });
     }
 
     const info = await ytdl.getInfo(url);
-    const videoFormat = ytdl.chooseFormat(info.formats, { quality: "highest" });
+    const videoFormat = ytdl.chooseFormat(info.formats, { quality: 'highest' });
 
     const sanitizedTitle = sanitize(info.videoDetails.title);
     const fileName = `${sanitizedTitle}.mp4`;
 
-    const directory = "D:/download/video";
-    if (!fs.existsSync(directory)) {
-      fs.mkdirSync("./Download-video");
-    }
+    const filePath = path.join(os.tmpdir(), fileName);
 
-    ytdl(url, { format: videoFormat }).pipe(res);
-
-    const filePath = `${directory}/${fileName}`;
     const fileStream = fs.createWriteStream(filePath);
 
+    fileStream.on('finish', () => {
+      const errorHandler = (err) => {
+        console.error('Error:', err.message);
+        res.status(500).json({ error: 'An error occurred' });
+      };
+
+      const downloadStream = send(req, filePath, { headers: { 'Content-Disposition': `attachment; filename="${fileName}"` } });
+      downloadStream.on('error', errorHandler);
+      downloadStream.on('end', () => {
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.error('Error:', err.message);
+          }
+        });
+      });
+
+      // Track the number of bytes sent
+      let bytesSent = 0;
+      downloadStream.on('data', (chunk) => {
+        bytesSent += chunk.length;
+      });
+
+      // Add bytesSent to the response header
+      res.setHeader('Content-Length', info.videoDetails.lengthSeconds);
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('X-Content-Length', bytesSent);
+
+      downloadStream.pipe(res);
+    });
+
     ytdl(url, { format: videoFormat }).pipe(fileStream);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "An error occurred" });
+
+    req.on('aborted', () => {
+      fileStream.destroy();
+    });
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ error: 'An error occurred' });
   }
 });
 
+
 router.post("/audio", async (req, res) => {
+
+  const { url, localFilePath } = req.body;
+
   try {
-    const url = req.body.url;
 
     if (!url || !ytdl.validateURL(url)) {
       return res.status(400).json({ error: "Invalid YouTube URL" });
@@ -51,9 +86,9 @@ router.post("/audio", async (req, res) => {
     const sanitizedTitle = sanitize(info.videoDetails.title);
     const fileName = `${sanitizedTitle}.mp3`;
 
-    const directory = "D:/download/audio";
+    const directory = localFilePath;
     if (!fs.existsSync(directory)) {
-      fs.mkdirSync("./Download-audio");
+      fs.mkdirSync(directory);
     }
 
     const filePath = `${directory}/${fileName}`;
@@ -75,14 +110,15 @@ router.post("/audio", async (req, res) => {
 });
 
 router.post("/playlist", async (req, res) => {
-  const playlistUrl = req.body.url;
+  const { playlistUrl, localFilePath } = req.body;
+
 
   try {
     const playlist = await ytpl(playlistUrl);
 
     const playlistTitle = playlist.title;
     const videos = playlist.items;
-    const directory = "D:/download/playlist";
+    const directory = localFilePath;
 
     if (!fs.existsSync(directory)) {
       fs.mkdirSync(directory);
