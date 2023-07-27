@@ -10,7 +10,11 @@ router.post("/video", async (req, res) => {
     const { url, localFilePath } = req.body;
 
     if (!url || !ytdl.validateURL(url)) {
-      return res.status(400).json({ error: "Invalid YouTube URL " });
+      return res.status(400).json({ error: "Invalid YouTube URL" });
+    }
+
+    if (typeof localFilePath !== 'string' || localFilePath.trim() === '') {
+      return res.status(400).json({ error: "Invalid local file path" });
     }
 
     const info = await ytdl.getInfo(url);
@@ -21,7 +25,7 @@ router.post("/video", async (req, res) => {
 
     const directory = localFilePath;
     if (!fs.existsSync(directory)) {
-      fs.mkdirSync(directory);
+      fs.mkdirSync(directory, { recursive: true });
     }
 
     const filePath = `${directory}/${fileName}`;
@@ -37,6 +41,7 @@ router.post("/video", async (req, res) => {
     res.status(500).json({ error: "An error occurred" });
   }
 });
+
 
 router.post("/audio", async (req, res) => {
   const { url, localFilePath } = req.body;
